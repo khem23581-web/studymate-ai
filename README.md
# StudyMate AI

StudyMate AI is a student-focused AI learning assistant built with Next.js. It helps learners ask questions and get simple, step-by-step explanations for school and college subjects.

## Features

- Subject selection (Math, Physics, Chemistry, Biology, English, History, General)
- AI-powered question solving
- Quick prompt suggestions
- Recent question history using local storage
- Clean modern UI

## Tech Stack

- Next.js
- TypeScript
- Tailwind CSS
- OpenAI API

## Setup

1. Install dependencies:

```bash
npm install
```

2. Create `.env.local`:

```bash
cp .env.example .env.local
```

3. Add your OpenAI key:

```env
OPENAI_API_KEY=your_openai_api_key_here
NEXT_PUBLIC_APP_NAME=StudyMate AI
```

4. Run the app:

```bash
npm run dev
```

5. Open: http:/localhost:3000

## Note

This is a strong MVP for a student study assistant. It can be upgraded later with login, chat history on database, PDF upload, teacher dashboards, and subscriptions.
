@@ -1,0 +1,56 @@
+import OpenAI from 'openai';
+import { NextRequest, NextResponse } from 'next/server';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { question, subject } = body;
+
+    if (!question || typeof question !== 'string') {
+      return NextResponse.json({ error: 'Question is required' }, { status: 400 });
+    }
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `
+You are a helpful AI study tutor for school and college students.
+Always answer in a clear, step-by-step style.
+- Explain the concept first when needed
+- Show formulas, steps, and reasoning
+- Give simple language for school students
+- Keep it educational and precise
+- If the question is complex, break it into smaller parts
+- If the question is not clear, ask a follow-up
+`,
+        },
+        {
+          role: 'user',
+          content: `
+Subject: ${subject || 'General'}
+Question: ${question}
+`,
+        },
+      ],
+      temperature: 0.5,
+      max_tokens: 700,
+    });
+
+    const answer = response.choices[0]?.message?.content || 'Sorry, I could not generate an answer.';
+
+    return NextResponse.json({ answer });
+  } catch (error: any) {
+    console.error('OpenAI API error:', error);
+
+    return NextResponse.json(
+      { error: error?.message || 'Something went wrong while generating the answer.' },
+      { status: 500 }
+    );
+  }
+}

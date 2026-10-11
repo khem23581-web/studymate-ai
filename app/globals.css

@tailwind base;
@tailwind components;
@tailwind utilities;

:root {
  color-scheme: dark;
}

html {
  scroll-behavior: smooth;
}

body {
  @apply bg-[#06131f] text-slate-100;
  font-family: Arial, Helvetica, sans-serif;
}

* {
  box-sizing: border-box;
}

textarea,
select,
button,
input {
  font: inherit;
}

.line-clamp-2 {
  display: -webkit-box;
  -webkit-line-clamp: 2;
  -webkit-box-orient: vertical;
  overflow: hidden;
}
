@@ -1,0 +1,478 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+
+const SUBJECTS = ['Math', 'Physics', 'Chemistry', 'Biology', 'English', 'History', 'General'];
+
+const QUICK_QUESTIONS = [
+  'Solve x^2 - 5x + 6 = 0',
+  'Explain photosynthesis in simple words',
+  'What is Newton\'s second law?',
+  'Difference between mitosis and meiosis',
+  'Write a short paragraph on pollution',
+  'What is the formula for force?',
+];
+
+type HistoryItem = {
+  question: string;
+  subject: string;
+  answer: string;
+  time: string;
+};
+
+export default function HomePage() {
+  const [question, setQuestion] = useState('');
+  const [subject, setSubject] = useState('Math');
+  const [answer, setAnswer] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('studymate-history');
+    if (saved) {
+      try {
+        setHistory(JSON.parse(saved));
+      } catch {
+        setHistory([]);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('studymate-history', JSON.stringify(history));
+  }, [history]);
+
+  const saveHistory = (newQuestion: string, newSubject: string, newAnswer: string) => {
+    const item: HistoryItem = {
+      question: newQuestion,
+      subject: newSubject,
+      answer: newAnswer,
+      time: new Date().toLocaleString(),
+    };
+
+    setHistory((prev) => [item, ...prev].slice(0, 6));
+  };
+
+  async function handleSubmit() {
+    if (!question.trim()) return;
+
+    setLoading(true);
+    setAnswer('');
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ question, subject }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to get answer');
+      }
+
+      setAnswer(data.answer);
+      saveHistory(question, subject, data.answer);
+    } catch (error: any) {
+      setAnswer(error.message || 'Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const fillQuestion = (text: string) => {
+    setQuestion(text);
+  };
+
+  return (
+    <main className="min-h-screen bg-[#06131f] text-slate-100">
+      <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">
+        <header className="mb-6 rounded-2xl border border-cyan-500/20 bg-slate-900/70 p-4 shadow-lg shadow-cyan-500/10 backdrop-blur-sm">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.28em] text-cyan-400">StudyMate AI</p>
+              <h1 className="mt-2 text-2xl font-bold md:text-3xl">Your AI Learning Companion</h1>
+            </div>
+            <div className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-4 py-2 text-sm text-cyan-200">
+              Students • School • College
+            </div>
+          </div>
+        </header>
+
+        <div className="grid gap-6 lg:grid-cols-[1.25fr,0.75fr]">
+          <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5 shadow-2xl shadow-slate-950/30">
+            <div className="mb-4 flex flex-wrap gap-2">
+              {SUBJECTS.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setSubject(item)}
+                  className={`rounded-full px-3 py-2 text-sm font-medium transition ${
+                    subject === item
+                      ? 'bg-cyan-500 text-slate-950'
+                      : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                  }`}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+
+            <label className="mb-2 block text-sm text-slate-300">Ask your question</label>
+            <textarea
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              rows={7}
+              placeholder="Example: Solve x^2 - 5x + 6 = 0"
+              className="w-full resize-none rounded-2xl border border-slate-700 bg-slate-950/70 p-4 text-base text-slate-50 outline-none transition focus:border-cyan-500"
+            />
+
+            <div className="mt-4">
+              <p className="mb-2 text-sm text-slate-400">Quick prompts</p>
+              <div className="flex flex-wrap gap-2">
+                {QUICK_QUESTIONS.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => fillQuestion(item)}
+                    className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-slate-200 transition hover:border-cyan-500 hover:text-cyan-300"
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={handleSubmit}
+              disabled={loading || !question.trim()}
+              className="mt-6 w-full rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-3 font-semibold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? 'Solving...' : 'Solve My Question'}
+            </button>
+          </section>
+
+          <aside className="space-y-6">
+            <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-lg font-semibold">AI Answer</h2>
+                <span className="rounded-full bg-cyan-500/10 px-2 py-1 text-xs text-cyan-300">Live</span>
+              </div>
+
+              <div className="min-h-[260px] whitespace-pre-wrap rounded-2xl bg-slate-950/70 p-4 text-sm leading-7 text-slate-200">
+                {answer || 'Your explanation will appear here...'}
+              </div>
+            </section>
+
+            <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
+              <h2 className="mb-3 text-lg font-semibold">Recent Questions</h2>
+              <div className="space-y-3">
+                {history.length === 0 ? (
+                  <p className="text-sm text-slate-400">No questions yet. Start solving.</p>
+                ) : (
+                  history.map((item, index) => (
+                    <button
+                      key={`${item.time}-${index}`}
+                      type="button"
+                      onClick={() => {
+                        setQuestion(item.question);
+                        setSubject(item.subject);
+                        setAnswer(item.answer);
+                      }}
+                      className="w-full rounded-2xl border border-slate-700 bg-slate-950/50 p-3 text-left transition hover:border-cyan-500"
+                    >
+                      <div className="mb-1 flex items-center justify-between gap-3">
+                        <span className="text-xs uppercase tracking-[0.2em] text-cyan-400">{item.subject}</span>
+                        <span className="text-[10px] text-slate-500">{item.time}</span>
+                      </div>
+                      <p className="line-clamp-2 text-sm text-slate-200">{item.question}</p>
+                    </button>
+                  ))
+                )}
+              </div>
+            </section>
+          </aside>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
